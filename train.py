@@ -42,6 +42,9 @@ parser.add_argument('--toy',
 parser.add_argument('--inflight',
     action='store_true',
     help='While training is in progress on a separate process, you can launch another instance of train.py with this flag turned on to build a model from the last available checkpoints rather that waiting until the end. Default: %(default)s')
+parser.add_argument("--wandb",
+    action="store_true",
+    help="Use Weights & Biases for logging")
 
 args = parser.parse_args() 
 try:
@@ -413,6 +416,25 @@ if (not (os.path.isfile(last_checkpoint) or args.inflight)) or changed or args.r
         webbrowser.open(url)
 
         cmd += ["--tensorboard", "--tensorboard_log_dir", log_dir]
+
+    if args.wandb:
+
+        if not config["wandb_project"]:
+            print("Please provide 'wandb_project' in the config file")
+            exit(1)
+
+        print("Initializing Weights & Biases")
+        import wandb
+        log_dir = os.path.join(onmt_dir, "logs")
+        cmd += ["--tensorboard", "--tensorboard_log_dir", log_dir]
+
+        wandb.tensorboard.patch(root_logdir=log_dir)
+
+        wandb.init(
+            project=config["wandb_project"],
+            name=f"{config['from']['code']}-{config['to']['code']}-{config['version']}",
+            config=vars(config)
+        )
     
     # Resume?
     checkpoints = get_checkpoints()
@@ -493,3 +515,6 @@ with zipfile.ZipFile(zip_filename, 'w') as zipf:
     zipdir(package_folder, zipf)
 os.rename(zip_filename, package_file)
 print("Done!")
+
+if args.wandb:
+    wandb.finish()
